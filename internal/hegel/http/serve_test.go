@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/go-logr/zerologr"
+	. "github.com/jacobweinstock/tink-stack/internal/hegel/http"
 	"github.com/rs/zerolog"
-	. "github.com/tinkerbell/hegel/internal/http"
 )
 
 // TestServe validates the Serve function does in-fact serve a functional HTTP server with the

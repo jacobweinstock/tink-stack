@@ -47,17 +47,14 @@ func (k KCPP) Do(ctx context.Context) error {
 	// Connect via RPC
 	rpcClient, err := client.Client()
 	if err != nil {
-		log.Println("in Do: error 1")
 		return err
 	}
-	log.Println("in Do: error 2")
 
 	// Request the plugin
 	raw, err := rpcClient.Dispense("kcp")
 	if err != nil {
 		return err
 	}
-	log.Println("in Do: error 3")
 
 	// We should have a KV store now! This feels like a normal interface
 	// implementation but is in fact over an RPC connection.
@@ -65,7 +62,6 @@ func (k KCPP) Do(ctx context.Context) error {
 	if !ok {
 		return fmt.Errorf("unexpected type from plugin: %T", raw)
 	}
-	log.Println("in Do: error 4")
 
 	done := make(chan error, 1)
 	go func() {

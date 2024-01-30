@@ -85,7 +85,52 @@ func main() {
 
 	// Start Smee
 	g.Go(func() error {
-		smee := cmd.Smee{}
+		time.Sleep(time.Second * 20)
+		smee := cmd.Smee{
+			Syslog: cmd.SyslogConfig{
+				Enabled:  true,
+				BindAddr: "0.0.0.0:514",
+			},
+			Tftp: cmd.Tftp{
+				BindAddr:        "0.0.0.0:69",
+				BlockSize:       512,
+				Enabled:         true,
+				IpxeScriptPatch: "",
+				Timeout:         time.Second * 5,
+			},
+			IpxeHTTPBinary: cmd.IpxeHTTPBinary{
+				Enabled: true,
+			},
+			IpxeHTTPScript: cmd.IpxeHTTPScript{
+				Enabled:         true,
+				BindAddr:        "0.0.0.0:80",
+				TinkServer:      "192.168.2.50:42113",
+				HookURL:         "http://192.168.2.50:9797",
+				ExtraKernelArgs: "tink_worker_image=quay.io/tinkerbell/tink-worker:v0.10.0",
+			},
+			Dhcp: cmd.DhcpConfig{
+				Enabled:           true,
+				Mode:              "reservation",
+				BindAddr:          "0.0.0.0:67",
+				IpForPacket:       "192.168.2.50",
+				SyslogIP:          "192.168.2.50",
+				TftpIP:            "192.168.2.50:69",
+				HttpIpxeBinaryURL: "http://192.168.2.50/ipxe/",
+				HttpIpxeScript: cmd.HttpIpxeScript{
+					Url:              "http://192.168.2.50/auto.ipxe",
+					InjectMacAddress: true,
+				},
+			},
+			LogLevel: "info",
+			Backends: cmd.DhcpBackends{
+				Kubernetes: cmd.Kube{
+					ConfigFilePath: "admin.kubeconfig",
+					Namespace:      "tink-system",
+					Enabled:        true,
+				},
+			},
+			Logger: logger.WithName("smee"),
+		}
 		return smee.Start(ctx)
 	})
 
