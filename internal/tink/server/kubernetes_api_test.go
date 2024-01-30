@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/internal/controller/tink/testtime"
+	"github.com/jacobweinstock/tink-stack/internal/tink/controller/testtime"
 	"github.com/jacobweinstock/tink-stack/internal/proto"
 	"go.uber.org/zap"
 )

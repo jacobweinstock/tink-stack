@@ -12,6 +12,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/jacobweinstock/tink-stack/cmd"
+	"github.com/jacobweinstock/tink-stack/internal/hegel"
+	"github.com/jacobweinstock/tink-stack/internal/smee"
+	"github.com/jacobweinstock/tink-stack/internal/tink"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -38,7 +41,7 @@ func main() {
 	// Start the Tinkerbell controller
 	g.Go(func() error {
 		time.Sleep(time.Second * 20)
-		tinkController := cmd.TinkController{
+		tinkController := tink.Controller{
 			Logger:               logger.WithName("tink-controller"),
 			Kubeconfig:           "admin.kubeconfig",
 			EnableLeaderElection: false,
@@ -51,7 +54,7 @@ func main() {
 	// Start the Tinkerbell Server
 	g.Go(func() error {
 		time.Sleep(time.Second * 20)
-		tinkServer := cmd.TinkServer{
+		tinkServer := tink.Server{
 			GRPCAuthority:  ":42113",
 			HTTPAuthority:  ":42114",
 			KubeconfigPath: "admin.kubeconfig",
@@ -70,7 +73,7 @@ func main() {
 	// Start Hegel
 	g.Go(func() error {
 		time.Sleep(time.Second * 20)
-		hegel := cmd.Hegel{
+		hs := hegel.Server{
 			TrustedProxies:       "",
 			HTTPAddr:             ":50061",
 			Backend:              "kubernetes",
@@ -80,35 +83,35 @@ func main() {
 			Logger:               logger.WithName("hegel"),
 			HegelAPI:             false,
 		}
-		return hegel.Start(ctx)
+		return hs.Start(ctx)
 	})
 
 	// Start Smee
 	g.Go(func() error {
 		time.Sleep(time.Second * 20)
-		smee := cmd.Smee{
-			Syslog: cmd.SyslogConfig{
+		ss := smee.Service{
+			Syslog: smee.SyslogConfig{
 				Enabled:  true,
 				BindAddr: "0.0.0.0:514",
 			},
-			Tftp: cmd.Tftp{
+			Tftp: smee.Tftp{
 				BindAddr:        "0.0.0.0:69",
 				BlockSize:       512,
 				Enabled:         true,
 				IpxeScriptPatch: "",
 				Timeout:         time.Second * 5,
 			},
-			IpxeHTTPBinary: cmd.IpxeHTTPBinary{
+			IpxeHTTPBinary: smee.IpxeHTTPBinary{
 				Enabled: true,
 			},
-			IpxeHTTPScript: cmd.IpxeHTTPScript{
+			IpxeHTTPScript: smee.IpxeHTTPScript{
 				Enabled:         true,
 				BindAddr:        "0.0.0.0:80",
 				TinkServer:      "192.168.2.50:42113",
 				HookURL:         "http://192.168.2.50:9797",
 				ExtraKernelArgs: "tink_worker_image=quay.io/tinkerbell/tink-worker:v0.10.0",
 			},
-			Dhcp: cmd.DhcpConfig{
+			Dhcp: smee.DhcpConfig{
 				Enabled:           true,
 				Mode:              "reservation",
 				BindAddr:          "0.0.0.0:67",
@@ -116,14 +119,14 @@ func main() {
 				SyslogIP:          "192.168.2.50",
 				TftpIP:            "192.168.2.50:69",
 				HttpIpxeBinaryURL: "http://192.168.2.50/ipxe/",
-				HttpIpxeScript: cmd.HttpIpxeScript{
+				HttpIpxeScript: smee.HttpIpxeScript{
 					Url:              "http://192.168.2.50/auto.ipxe",
 					InjectMacAddress: true,
 				},
 			},
 			LogLevel: "info",
-			Backends: cmd.DhcpBackends{
-				Kubernetes: cmd.Kube{
+			Backends: smee.DhcpBackends{
+				Kubernetes: smee.Kube{
 					ConfigFilePath: "admin.kubeconfig",
 					Namespace:      "tink-system",
 					Enabled:        true,
@@ -131,7 +134,7 @@ func main() {
 			},
 			Logger: logger.WithName("smee"),
 		}
-		return smee.Start(ctx)
+		return ss.Start(ctx)
 	})
 
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {

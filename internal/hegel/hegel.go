@@ -1,4 +1,4 @@
-package cmd
+package hegel
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type Hegel struct {
+type Server struct {
 	TrustedProxies       string
 	HTTPAddr             string
 	Backend              string
@@ -35,7 +35,7 @@ type Hegel struct {
 	HegelAPI bool
 }
 
-func (h Hegel) Start(ctx context.Context) error {
+func (h Server) Start(ctx context.Context) error {
 	if h.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -74,7 +74,7 @@ func (h Hegel) Start(ctx context.Context) error {
 	return hegelhttp.Serve(ctx, h.Logger, h.HTTPAddr, router)
 }
 
-func (h Hegel) toBackendOptions() backend.Options {
+func (h Server) toBackendOptions() backend.Options {
 	var backndOpts backend.Options
 	switch h.Backend {
 	case "flatfile":

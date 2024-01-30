@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/internal/controller/tink/workflow"
+	"github.com/jacobweinstock/tink-stack/internal/tink/controller/workflow"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"

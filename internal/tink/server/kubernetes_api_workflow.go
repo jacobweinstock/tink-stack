@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
 	"github.com/jacobweinstock/tink-stack/internal/proto"
-	"github.com/jacobweinstock/tink-stack/internal/controller/tink/workflow"
+	"github.com/jacobweinstock/tink-stack/internal/tink/controller/workflow"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

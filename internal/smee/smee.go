@@ -1,4 +1,4 @@
-package cmd
+package smee
 
 import (
 	"context"
@@ -38,7 +38,7 @@ var (
 	startTime = time.Now()
 )
 
-type Smee struct {
+type Service struct {
 	Syslog         SyslogConfig
 	Tftp           Tftp
 	IpxeHTTPBinary IpxeHTTPBinary
@@ -119,7 +119,7 @@ type File struct {
 	Enabled  bool
 }
 
-func (s Smee) Start(ctx context.Context) error {
+func (s Service) Start(ctx context.Context) error {
 	metric.Init()
 
 	log := s.Logger
@@ -243,7 +243,7 @@ func (s Smee) Start(ctx context.Context) error {
 	return nil
 }
 
-func (c *Smee) dhcpHandler(ctx context.Context, log logr.Logger) (server.Handler, error) {
+func (c *Service) dhcpHandler(ctx context.Context, log logr.Logger) (server.Handler, error) {
 	// 1. create the handler
 	// 2. create the backend
 	// 3. add the backend to the handler
