@@ -19,3 +19,12 @@
 
 # Go workspace file
 go.work
+
+sa.key
+apiserver.key
+apiserver.crt
+admin.kubeconfig
+.admin-token-store
+etcd-server/
+_internal/
+_tmp/
