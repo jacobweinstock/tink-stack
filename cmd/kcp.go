@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -28,7 +29,7 @@ func (k KCPP) Do(ctx context.Context) error {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   "kcp plugin",
 		Output: os.Stdout,
-		Level:  hclog.Trace,
+		Level:  hclog.Info,
 	})
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  shared.HandshakeConfig,
@@ -39,6 +40,7 @@ func (k KCPP) Do(ctx context.Context) error {
 		Managed:          true,
 		SyncStdout:       os.Stdout,
 		SyncStderr:       os.Stderr,
+		StartTimeout:     time.Minute,
 	})
 	defer client.Kill()
 
@@ -48,12 +50,14 @@ func (k KCPP) Do(ctx context.Context) error {
 		log.Println("in Do: error 1")
 		return err
 	}
+	log.Println("in Do: error 2")
 
 	// Request the plugin
 	raw, err := rpcClient.Dispense("kcp")
 	if err != nil {
 		return err
 	}
+	log.Println("in Do: error 3")
 
 	// We should have a KV store now! This feels like a normal interface
 	// implementation but is in fact over an RPC connection.
@@ -61,20 +65,18 @@ func (k KCPP) Do(ctx context.Context) error {
 	if !ok {
 		return fmt.Errorf("unexpected type from plugin: %T", raw)
 	}
+	log.Println("in Do: error 4")
 
 	done := make(chan error, 1)
 	go func() {
 		_, err := kv.Start(ctx, &protobuf.Empty{})
+		log.Println("in Do: error 5", err)
 		done <- err
 	}()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	case err := <-done:
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("error with kcp: %w", err)
 	}
-
-	return nil
 }

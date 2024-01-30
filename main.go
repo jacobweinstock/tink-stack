@@ -32,11 +32,7 @@ func main() {
 			DataDir:    "",
 			PluginFile: "/home/tink/repos/jacobweinstock/tink-stack/plugin/kcp",
 		}
-		if err := kcp.Do(ctx); err != nil {
-			done()
-			return err
-		}
-		return nil
+		return kcp.Do(ctx)
 	})
 
 	// Start the Tinkerbell controller
@@ -49,16 +45,19 @@ func main() {
 			MetricsAddr:          ":8080",
 			ProbeAddr:            ":8081",
 		}
-		if err := tinkController.Start(ctx); err != nil {
-			done()
-			return err
-		}
-		return nil
+		return tinkController.Start(ctx)
 	})
 
 	// Start the Tinkerbell Server
 	g.Go(func() error {
-		tinkServer := cmd.TinkServer{}
+		time.Sleep(time.Second * 20)
+		tinkServer := cmd.TinkServer{
+			GRPCAuthority:  ":42113",
+			HTTPAuthority:  ":42114",
+			KubeconfigPath: "admin.kubeconfig",
+			KubeNamespace:  "tink-system",
+			Logger:         logger,
+		}
 		return tinkServer.Start(ctx)
 	})
 
@@ -81,11 +80,7 @@ func main() {
 			Logger:               logger.WithName("hegel"),
 			HegelAPI:             false,
 		}
-		if err := hegel.Start(ctx); err != nil {
-			done()
-			return err
-		}
-		return nil
+		return hegel.Start(ctx)
 	})
 
 	// Start Smee
