@@ -24,7 +24,7 @@ var pluginMap = map[string]plugin.Plugin{
 	"kcp": &shared.KCPGRPCPlugin{},
 }
 
-func (k KCPP) Do() error {
+func (k KCPP) Do(ctx context.Context) error {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Name:   "kcp plugin",
 		Output: os.Stdout,
@@ -33,7 +33,7 @@ func (k KCPP) Do() error {
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  shared.HandshakeConfig,
 		Plugins:          pluginMap,
-		Cmd:              exec.Command("//home/tink/repos/jacobweinstock/kcp-plugin/kcp"),
+		Cmd:              exec.Command("/home/tink/repos/jacobweinstock/kcp-plugin/kcp"),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           logger,
 		Managed:          true,
@@ -62,8 +62,18 @@ func (k KCPP) Do() error {
 		return fmt.Errorf("unexpected type from plugin: %T", raw)
 	}
 
-	if _, err := kv.Start(context.Background(), &protobuf.Empty{}); err != nil {
-		return err
+	done := make(chan error, 1)
+	go func() {
+		_, err := kv.Start(ctx, &protobuf.Empty{})
+		done <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-done:
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
