@@ -11,10 +11,11 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
-	"github.com/jacobweinstock/tink-stack/cmd"
-	"github.com/jacobweinstock/tink-stack/internal/hegel"
-	"github.com/jacobweinstock/tink-stack/internal/smee"
-	"github.com/jacobweinstock/tink-stack/internal/tink"
+	"github.com/jacobweinstock/tink-stack/hegel"
+	"github.com/jacobweinstock/tink-stack/kcp"
+	"github.com/jacobweinstock/tink-stack/rufio"
+	"github.com/jacobweinstock/tink-stack/smee"
+	"github.com/jacobweinstock/tink-stack/tink"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -29,14 +30,15 @@ func main() {
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		// Start the KCP server with embedded etcd
-		kcp := cmd.KCPP{
+		// Start the KCP server with embedded etcd plugin
+		kcp := kcp.Plugin{
 			Context:    ctx,
 			DataDir:    "",
 			PluginFile: "/home/tink/repos/jacobweinstock/tink-stack/plugin/kcp",
 		}
-		return kcp.Do(ctx)
+		return kcp.Start(ctx)
 	})
+	// TODO(jacobweinstock): add a wait for the kcp server to be ready
 
 	// Start the Tinkerbell controller
 	g.Go(func() error {
@@ -66,8 +68,8 @@ func main() {
 
 	// Start Rufio
 	g.Go(func() error {
-		rufio := cmd.Rufio{}
-		return rufio.Start(ctx)
+		r := rufio.Controller{}
+		return r.Start(ctx)
 	})
 
 	// Start Hegel
