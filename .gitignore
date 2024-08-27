@@ -28,3 +28,10 @@ admin.kubeconfig
 etcd-server/
 _internal/
 _tmp/
+tink-stack
+*.pem
+*.key
+*.crt
+*.csr
+*.key
+kubeconfig

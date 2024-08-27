@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
+	"github.com/tinkerbell/tink/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -158,7 +158,7 @@ func TestToNetbootData(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := toNetbootData(tt.in)
+			got, err := toNetbootData(tt.in, "")
 			if tt.shouldErr && err == nil {
 				t.Fatal("expected error")
 			}
@@ -199,6 +199,7 @@ func TestGetByIP(t *testing.T) {
 				Scheme: "http",
 				Host:   "netboot.xyz",
 			},
+			Facility: "onprem",
 		}},
 	}
 
@@ -296,6 +297,7 @@ func TestGetByMac(t *testing.T) {
 				Scheme: "http",
 				Host:   "netboot.xyz",
 			},
+			Facility: "onprem",
 		}},
 	}
 
@@ -373,6 +375,11 @@ var hwObject1 = v1alpha1.Hardware{
 		Namespace: "default",
 	},
 	Spec: v1alpha1.HardwareSpec{
+		Metadata: &v1alpha1.HardwareMetadata{
+			Facility: &v1alpha1.MetadataFacility{
+				FacilityCode: "onprem",
+			},
+		},
 		Interfaces: []v1alpha1.Interface{
 			{
 				Netboot: &v1alpha1.Netboot{
@@ -432,6 +439,11 @@ var hwObject2 = v1alpha1.Hardware{
 					NameServers: []string{"1.1.1.1"},
 					UEFI:        true,
 				},
+			},
+		},
+		Metadata: &v1alpha1.HardwareMetadata{
+			Facility: &v1alpha1.MetadataFacility{
+				FacilityCode: "ewr2",
 			},
 		},
 	},

@@ -19,13 +19,17 @@ import (
 )
 
 type Handler struct {
-	Logger             logr.Logger
-	Backend            handler.BackendReader
-	OSIEURL            string
-	ExtraKernelParams  []string
-	PublicSyslogFQDN   string
-	TinkServerTLS      bool
-	TinkServerGRPCAddr string
+	Logger                logr.Logger
+	Backend               handler.BackendReader
+	OSIEURL               string
+	ExtraKernelParams     []string
+	PublicSyslogFQDN      string
+	TinkServerTLS         bool
+	TinkServerInsecureTLS bool
+	TinkServerGRPCAddr    string
+	IPXEScriptRetries     int
+	IPXEScriptRetryDelay  int
+	StaticIPXEEnabled     bool
 }
 
 type data struct {
@@ -43,6 +47,9 @@ type data struct {
 // getByMac uses the handler.BackendReader to get the (hardware) data and then
 // translates it to the script.Data struct.
 func getByMac(ctx context.Context, mac net.HardwareAddr, br handler.BackendReader) (data, error) {
+	if br == nil {
+		return data{}, errors.New("backend is nil")
+	}
 	d, n, err := br.GetByMac(ctx, mac)
 	if err != nil {
 		return data{}, err
@@ -62,6 +69,9 @@ func getByMac(ctx context.Context, mac net.HardwareAddr, br handler.BackendReade
 }
 
 func getByIP(ctx context.Context, ip net.IP, br handler.BackendReader) (data, error) {
+	if br == nil {
+		return data{}, errors.New("backend is nil")
+	}
 	d, n, err := br.GetByIP(ctx, ip)
 	if err != nil {
 		return data{}, err
@@ -98,6 +108,7 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
 		defer timer.ObserveDuration()
 
 		ctx := r.Context()
+
 		// Should we serve a custom ipxe script?
 		// This gates serving PXE file by
 		// 1. the existence of a hardware record in tink server
@@ -109,6 +120,11 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
 		// Try to get the MAC address from the URL path, if not available get the source IP address.
 		if ha, err := getMAC(r.URL.Path); err == nil {
 			hw, err := getByMac(ctx, ha, h.Backend)
+			if err != nil && h.StaticIPXEEnabled {
+				h.Logger.Info("serving static ipxe script", "mac", ha, "error", err)
+				h.serveStaticIPXEScript(w)
+				return
+			}
 			if err != nil || !hw.AllowNetboot {
 				w.WriteHeader(http.StatusNotFound)
 				h.Logger.Info("the hardware data for this machine, or lack there of, does not allow it to pxe", "client", ha, "error", err)
@@ -120,6 +136,11 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
 		}
 		if ip, err := getIP(r.RemoteAddr); err == nil {
 			hw, err := getByIP(ctx, ip, h.Backend)
+			if err != nil && h.StaticIPXEEnabled {
+				h.Logger.Info("serving static ipxe script", "client", r.RemoteAddr, "error", err)
+				h.serveStaticIPXEScript(w)
+				return
+			}
 			if err != nil || !hw.AllowNetboot {
 				w.WriteHeader(http.StatusNotFound)
 				h.Logger.Info("the hardware data for this machine, or lack there of, does not allow it to pxe", "client", r.RemoteAddr, "error", err)
@@ -133,6 +154,28 @@ func (h *Handler) HandlerFunc() http.HandlerFunc {
 		// If we get here, we were unable to get the MAC address from the URL path or the source IP address.
 		w.WriteHeader(http.StatusNotFound)
 		h.Logger.Info("unable to get the MAC address from the URL path or the source IP address", "client", r.RemoteAddr, "urlPath", r.URL.Path)
+	}
+}
+
+func (h *Handler) serveStaticIPXEScript(w http.ResponseWriter) {
+	// Serve static iPXE script.
+	auto := Hook{
+		DownloadURL:       h.OSIEURL,
+		ExtraKernelParams: h.ExtraKernelParams,
+		SyslogHost:        h.PublicSyslogFQDN,
+		TinkerbellTLS:     h.TinkServerTLS,
+		TinkGRPCAuthority: h.TinkServerGRPCAddr,
+	}
+	script, err := GenerateTemplate(auto, StaticScript)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		h.Logger.Error(err, "error generating the static ipxe script")
+		return
+	}
+	if _, err := w.Write([]byte(script)); err != nil {
+		h.Logger.Error(err, "unable to send the static ipxe script")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -216,17 +259,20 @@ func (h *Handler) defaultScript(span trace.Span, hw data) (string, error) {
 	}
 
 	auto := Hook{
-		Arch:              arch,
-		Console:           "",
-		DownloadURL:       h.OSIEURL,
-		ExtraKernelParams: h.ExtraKernelParams,
-		Facility:          hw.Facility,
-		HWAddr:            mac.String(),
-		SyslogHost:        h.PublicSyslogFQDN,
-		TinkerbellTLS:     h.TinkServerTLS,
-		TinkGRPCAuthority: h.TinkServerGRPCAddr,
-		VLANID:            hw.VLANID,
-		WorkerID:          wID,
+		Arch:                  arch,
+		Console:               "",
+		DownloadURL:           h.OSIEURL,
+		ExtraKernelParams:     h.ExtraKernelParams,
+		Facility:              hw.Facility,
+		HWAddr:                mac.String(),
+		SyslogHost:            h.PublicSyslogFQDN,
+		TinkerbellTLS:         h.TinkServerTLS,
+		TinkerbellInsecureTLS: h.TinkServerInsecureTLS,
+		TinkGRPCAuthority:     h.TinkServerGRPCAddr,
+		VLANID:                hw.VLANID,
+		WorkerID:              wID,
+		Retries:               h.IPXEScriptRetries,
+		RetryDelay:            h.IPXEScriptRetryDelay,
 	}
 	if sc := span.SpanContext(); sc.IsSampled() {
 		auto.TraceID = sc.TraceID().String()

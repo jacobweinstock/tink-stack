@@ -3,67 +3,70 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/jacobweinstock/tink-stack/hegel"
-	"github.com/jacobweinstock/tink-stack/kcp"
 	"github.com/jacobweinstock/tink-stack/rufio"
-	"github.com/jacobweinstock/tink-stack/smee"
+	smee "github.com/jacobweinstock/tink-stack/smee/cmd"
 	"github.com/jacobweinstock/tink-stack/tink"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+type Config struct {
+	// LogLevel is the log level for the application.
+	LogLevel       string           `json:"log_level,omitempty"`
+	Kubeconfig     string           `json:"kubeconfig,omitempty"`
+	Namespace      string           `json:"namespace,omitempty"`
+	PublicIPv4     string           `json:"public_ipv4,omitempty"`
+	TinkController tink.Controller  `json:"tink_controller,omitempty"`
+	TinkServer     tink.Server      `json:"tink_server,omitempty"`
+	Rufio          rufio.Controller `json:"rufio,omitempty"`
+	Hegel          hegel.Server     `json:"hegel,omitempty"`
+	Smee           *smee.Service    `json:"smee,omitempty"`
+}
 
 func main() {
 	ctx, done := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM)
 	defer done()
 
-	logger := defaultLogger("info")
+	c := &Config{
+		Smee: &smee.Service{},
+	}
+	fs := flag.NewFlagSet("tinkerbell", flag.ExitOnError)
+	cli := newCLI(c, fs)
+	cli.Parse(os.Args[1:])
+
+	logger := defaultLogger(c.LogLevel)
 
 	g, ctx := errgroup.WithContext(ctx)
+	// TODO(jacobweinstock): add a wait for the kcp server to be ready. Is there a way to do this in the plugin?
 
-	g.Go(func() error {
-		// Start the KCP server with embedded etcd plugin
-		kcp := kcp.Plugin{
-			Context:    ctx,
-			DataDir:    "",
-			PluginFile: "/home/tink/repos/jacobweinstock/tink-stack/plugin/kcp",
-		}
-		return kcp.Start(ctx)
-	})
-	// TODO(jacobweinstock): add a wait for the kcp server to be ready
+	// install CRDs
 
-	// Start the Tinkerbell controller
+	// Start the Tink controller
 	g.Go(func() error {
-		time.Sleep(time.Second * 20)
-		tinkController := tink.Controller{
-			Logger:               logger.WithName("tink-controller"),
-			Kubeconfig:           "admin.kubeconfig",
-			EnableLeaderElection: false,
-			MetricsAddr:          ":8080",
-			ProbeAddr:            ":8081",
-		}
-		return tinkController.Start(ctx)
+		c.TinkController.Logger = logger.WithName("tink-controller")
+		c.TinkController.Kubeconfig = c.Kubeconfig
+		return c.TinkController.Start(ctx)
 	})
 
-	// Start the Tinkerbell Server
+	// Start the Tink Server
 	g.Go(func() error {
-		time.Sleep(time.Second * 20)
-		tinkServer := tink.Server{
-			GRPCAuthority:  ":42113",
-			HTTPAuthority:  ":42114",
-			KubeconfigPath: "admin.kubeconfig",
-			KubeNamespace:  "tink-system",
-			Logger:         logger,
-		}
-		return tinkServer.Start(ctx)
+		c.TinkServer.Logger = logger.WithName("tink-server")
+		c.TinkServer.KubeconfigPath = c.Kubeconfig
+		c.TinkServer.KubeNamespace = c.Namespace
+		return c.TinkServer.Start(ctx)
 	})
 
 	// Start Rufio
@@ -74,69 +77,32 @@ func main() {
 
 	// Start Hegel
 	g.Go(func() error {
-		time.Sleep(time.Second * 20)
-		hs := hegel.Server{
-			TrustedProxies:       "",
-			HTTPAddr:             ":50061",
-			Backend:              "kubernetes",
-			KubernetesKubeconfig: "admin.kubeconfig",
-			KubernetesNamespace:  "tink-system",
-			Debug:                true,
-			Logger:               logger.WithName("hegel"),
-			HegelAPI:             false,
-		}
-		return hs.Start(ctx)
+		c.Hegel.Logger = logger.WithName("hegel")
+		c.Hegel.KubernetesKubeconfig = c.Kubeconfig
+		c.Hegel.KubernetesNamespace = c.Namespace
+		c.Hegel.Backend = "kubernetes"
+		ctrl.SetLogger(c.Hegel.Logger)
+		klog.SetLogger(c.Hegel.Logger)
+		return c.Hegel.Start(ctx)
 	})
 
 	// Start Smee
 	g.Go(func() error {
-		time.Sleep(time.Second * 20)
-		ss := smee.Service{
-			Syslog: smee.SyslogConfig{
-				Enabled:  true,
-				BindAddr: "0.0.0.0:514",
-			},
-			Tftp: smee.Tftp{
-				BindAddr:        "0.0.0.0:69",
-				BlockSize:       512,
-				Enabled:         true,
-				IpxeScriptPatch: "",
-				Timeout:         time.Second * 5,
-			},
-			IpxeHTTPBinary: smee.IpxeHTTPBinary{
-				Enabled: true,
-			},
-			IpxeHTTPScript: smee.IpxeHTTPScript{
-				Enabled:         true,
-				BindAddr:        "0.0.0.0:80",
-				TinkServer:      "192.168.2.50:42113",
-				HookURL:         "http://192.168.2.50:9797",
-				ExtraKernelArgs: "tink_worker_image=quay.io/tinkerbell/tink-worker:v0.10.0",
-			},
-			Dhcp: smee.DhcpConfig{
-				Enabled:           true,
-				Mode:              "reservation",
-				BindAddr:          "0.0.0.0:67",
-				IpForPacket:       "192.168.2.50",
-				SyslogIP:          "192.168.2.50",
-				TftpIP:            "192.168.2.50:69",
-				HttpIpxeBinaryURL: "http://192.168.2.50/ipxe/",
-				HttpIpxeScript: smee.HttpIpxeScript{
-					Url:              "http://192.168.2.50/auto.ipxe",
-					InjectMacAddress: true,
-				},
-			},
-			LogLevel: "info",
-			Backends: smee.DhcpBackends{
-				Kubernetes: smee.Kube{
-					ConfigFilePath: "admin.kubeconfig",
-					Namespace:      "tink-system",
-					Enabled:        true,
-				},
-			},
-			Logger: logger.WithName("smee"),
+		kernelArgs := []string{
+			c.Smee.IpxeHTTPScript.ExtraKernelArgs,
+			"tink_worker_image=quay.io/tinkerbell/tink-worker:v0.10.0",
+			"console=tty1",
+			"console=tty2",
+			"console=ttyAMA0,115200",
+			"console=ttyAMA1,115200",
+			"console=ttyS0,115200",
+			"console=ttyS1,115200",
 		}
-		return ss.Start(ctx)
+		c.Smee.IpxeHTTPScript.ExtraKernelArgs = strings.Join(kernelArgs, " ")
+		c.Smee.Backends.Kubernetes.ConfigFilePath = c.Kubeconfig
+		c.Smee.Backends.Kubernetes.Namespace = c.Namespace
+		c.Smee.Backends.Kubernetes.Enabled = true
+		return c.Smee.Start(ctx, logger.WithName("smee"))
 	})
 
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {

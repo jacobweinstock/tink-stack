@@ -11,9 +11,12 @@ import (
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var errNotFound = errors.New("no hardware found")
@@ -52,12 +55,17 @@ func NewBackend(ctx context.Context, cfg Config) (*Backend, error) {
 	conf := func(opts *cluster.Options) {
 		opts.Scheme = scheme
 		opts.Cache.DefaultNamespaces = map[string]cache.Config{cfg.Namespace: {}}
+		opts.Logger = cfg.Logger
 	}
 
 	clstr, err := cluster.New(cfg.ClientConfig, conf)
 	if err != nil {
 		return nil, fmt.Errorf("create cluster: %v", err)
 	}
+
+	log.SetLogger(cfg.Logger)
+	ctrl.SetLogger(cfg.Logger)
+	klog.SetLogger(cfg.Logger)
 
 	err = clstr.GetFieldIndexer().IndexField(
 		ctx,

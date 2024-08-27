@@ -99,7 +99,7 @@ func (t Server) Start(ctx context.Context) error {
 	httpserver.SetupHTTP(ctx, t.Logger, t.HTTPAuthority, errCh)
 	select {
 	case err := <-errCh:
-		t.Logger.Error(err, "")
+		t.Logger.Error(err, "tink server error")
 	case <-ctx.Done():
 		t.Logger.Info("signal received, stopping servers")
 	}

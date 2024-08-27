@@ -2,8 +2,6 @@ package hegel
 
 import (
 	"context"
-	"os/signal"
-	"syscall"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/logr"
@@ -67,10 +65,6 @@ func (h Server) Start(ctx context.Context) error {
 
 	hack.Configure(router, be)
 
-	// Listen for signals to gracefully shutdown.
-	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	defer cancel()
-
 	return hegelhttp.Serve(ctx, h.Logger, h.HTTPAddr, router)
 }
 
@@ -85,12 +79,18 @@ func (h Server) toBackendOptions() backend.Options {
 		}
 	case "kubernetes":
 		backndOpts = backend.Options{
-			Kubernetes: &kubernetes.Config{
-				APIServerAddress: h.KubernetesAPIServer,
-				Kubeconfig:       h.KubernetesKubeconfig,
-				Namespace:        h.KubernetesNamespace,
-			},
+			Kubernetes: &kubernetes.Config{},
 		}
+		if h.KubernetesAPIServer != "" {
+			backndOpts.Kubernetes.APIServerAddress = "https://kubernetes.default.svc"
+		}
+		if h.KubernetesKubeconfig != "" {
+			backndOpts.Kubernetes.Kubeconfig = h.KubernetesKubeconfig
+		}
+		if h.KubernetesNamespace != "" {
+			backndOpts.Kubernetes.Namespace = h.KubernetesNamespace
+		}
+		backndOpts.Kubernetes.Logger = h.Logger
 	}
 	return backndOpts
 }

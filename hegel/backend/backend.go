@@ -39,11 +39,17 @@ func New(ctx context.Context, opts Options) (Client, error) {
 		return flatfile.FromYAMLFile(opts.Flatfile.Path)
 
 	case opts.Kubernetes != nil:
-		kubeclient, err := kubernetes.NewBackend(ctx, kubernetes.Config{
-			Kubeconfig:       opts.Kubernetes.Kubeconfig,
-			APIServerAddress: opts.Kubernetes.APIServerAddress,
-			Namespace:        opts.Kubernetes.Namespace,
-		})
+		cfg := kubernetes.Config{}
+		if opts.Kubernetes.APIServerAddress != "" {
+			cfg.APIServerAddress = opts.Kubernetes.APIServerAddress
+		}
+		if opts.Kubernetes.Kubeconfig != "" {
+			cfg.Kubeconfig = opts.Kubernetes.Kubeconfig
+		}
+		if opts.Kubernetes.Namespace != "" {
+			cfg.Namespace = opts.Kubernetes.Namespace
+		}
+		kubeclient, err := kubernetes.NewBackend(ctx, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("kubernetes client: %v", err)
 		}

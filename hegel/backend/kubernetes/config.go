@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"github.com/go-logr/logr"
 	"k8s.io/client-go/rest"
 )
 
@@ -20,4 +21,5 @@ type Config struct {
 	// ClientConfig is a Kubernetes client config. If specified, it will be used instead of
 	// constructing a client using the other configuration in this object. Optional.
 	ClientConfig *rest.Config
+	Logger       logr.Logger
 }

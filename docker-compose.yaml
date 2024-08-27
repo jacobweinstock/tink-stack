@@ -1,0 +1,66 @@
+services:
+
+  etcd:
+    image: registry.k8s.io/etcd:3.5.15-0
+    command:
+      - etcd
+      - --advertise-client-urls=http://0.0.0.0:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+
+  kube-apiserver:
+    image: registry.k8s.io/kube-apiserver:v1.30.4
+    command:
+      - kube-apiserver
+      - --etcd-servers=http://etcd:2379
+      - --service-account-key-file=service-account-key.pem
+      - --service-account-signing-key-file=service-account-key.pem
+      - --service-account-issuer=api
+      - --tls-cert-file=server.crt
+      - --tls-private-key-file=server.key
+      - --client-ca-file=ca.crt
+    working_dir: /code
+    ports:
+      - 6443:6443
+    volumes:
+      - ./script/cert:/code
+    depends_on:
+      - etcd
+
+  tink-stack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: -kubeconfig /kubeconfig -namespace default -osie-url http://192.168.2.50:8787 -tink-server 192.168.2.50:42113
+    network_mode: host
+    volumes:
+      - ./script/cert/kubeconfig:/kubeconfig
+    restart: on-failure
+    depends_on:
+      - kube-apiserver
+      - tink-crds-apply
+      - rufio-crds-apply
+    
+    ## "init" containers; they run until they accomplish their purpose and then exit
+  tink-crds-apply:
+    image: bitnami/kubectl:1.30.4
+    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/tink/config/crd?ref=v0.10.0'
+    environment:
+      KUBECONFIG: /kubeconfig
+      KUBERNETES: https://kube-apiserver:6443
+    depends_on:
+      - kube-apiserver
+    volumes:
+      - ./script/cert/kubeconfig:/kubeconfig
+    restart: on-failure
+
+  rufio-crds-apply:
+    image: bitnami/kubectl:1.30.4
+    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/rufio/config/crd?ref=v0.3.3'
+    environment:
+      KUBECONFIG: /kubeconfig
+      KUBERNETES: https://kube-apiserver:6443
+    depends_on:
+      - kube-apiserver
+    volumes:
+      - ./script/cert/kubeconfig:/kubeconfig
+    restart: on-failure
