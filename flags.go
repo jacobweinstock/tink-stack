@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/jacobweinstock/tink-stack/cmd/flag"
+	"github.com/jacobweinstock/tink-stack/cmd/flag/config"
 	"github.com/peterbourgon/ff/v4"
 )
 
@@ -46,7 +47,7 @@ func hegelFlags(c *Config, fs *ff.FlagSet) {
 }
 
 func smeeFlags(c *Config, fs *ff.FlagSet) {
-	sfs := flag.NewSmeeFlagSet()
+	sfs := config.NewSmeeFlagSet()
 
-	flag.RegisterSmee(&flag.FlagSet{FlagSet: fs}, c.Smee, sfs)
+	config.RegisterSmee(&flag.FlagSet{FlagSet: fs}, c.Smee, sfs)
 }
