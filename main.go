@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,9 +24,12 @@ import (
 type Config struct {
 	// LogLevel is the log level for the application.
 	LogLevel       string           `json:"log_level,omitempty"`
+	Backend        backend          `json:"backend,omitempty"`
+	OTEL           otel             `json:"otel,omitempty"`
 	Kubeconfig     string           `json:"kubeconfig,omitempty"`
 	Namespace      string           `json:"namespace,omitempty"`
 	PublicIPv4     string           `json:"public_ipv4,omitempty"`
+	TrustedProxies []netip.Prefix   `json:"trusted_proxies,omitempty"`
 	TinkController tink.Controller  `json:"tink_controller,omitempty"`
 	TinkServer     tink.Server      `json:"tink_server,omitempty"`
 	Rufio          rufio.Controller `json:"rufio,omitempty"`
@@ -33,25 +37,47 @@ type Config struct {
 	Smee           *smee.Config     `json:"smee,omitempty"`
 }
 
-func main() {
+type otel struct {
+	Endpoint string `json:"otel_endpoint,omitempty"`
+	Insecure bool   `json:"otel_insecure,omitempty"`
+}
 
+type backend string
+
+const (
+	backendKube backend = "kube"
+	backendFile backend = "file"
+	backendNoop backend = "noop"
+)
+
+func main() {
 	ctx, done := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM)
 	defer done()
 
 	c := &Config{
-		Smee: &smee.Config{},
+		Smee: &smee.Config{
+			DHCP: smee.DHCP{
+				Mode: smee.DHCPModeProxy,
+			},
+		},
 	}
 	fs := ff.NewFlagSet("tinkerbell")
 	cli := newCLI(c, fs)
 	if err := cli.Parse(os.Args[1:], ff.WithEnvVarPrefix("TINKERBELL")); err != nil {
+		fmt.Fprintln(os.Stderr, ffhelp.Command(cli))
 		if !errors.Is(err, ff.ErrHelp) {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		}
-		fmt.Fprintln(os.Stderr, ffhelp.Command(cli))
+
 		os.Exit(1)
 	}
 
 	logger := cmd.DefaultLogger(c.LogLevel)
+	logger.Info("debugging", "c.Smee.DHCP.Enabled", c.Smee.DHCP.Enabled)
+	logger.Info("debugging", "c.Smee.DHCP.TFTPPort", c.Smee.DHCP.TFTPPort)
+	logger.Info("debugging", "c.Smee.DHCP.IPForPacket", c.Smee.DHCP.IPForPacket)
+	logger.Info("debugging", "c.Smee.DHCP.Mode", c.Smee.DHCP.Mode)
+	return
 
 	g, ctx := errgroup.WithContext(ctx)
 	// TODO(jacobweinstock): add a wait for the kcp server to be ready. Is there a way to do this in the plugin?
@@ -62,7 +88,10 @@ func main() {
 	g.Go(func() error {
 		c.TinkController.Logger = logger.WithName("tink-controller")
 		c.TinkController.Kubeconfig = c.Kubeconfig
-		return c.TinkController.Start(ctx)
+		if err := c.TinkController.Start(ctx); err != nil {
+			return fmt.Errorf("tink controller failed: %w", err)
+		}
+		return nil
 	})
 
 	// Start the Tink Server
@@ -70,13 +99,19 @@ func main() {
 		c.TinkServer.Logger = logger.WithName("tink-server")
 		c.TinkServer.KubeconfigPath = c.Kubeconfig
 		c.TinkServer.KubeNamespace = c.Namespace
-		return c.TinkServer.Start(ctx)
+		if err := c.TinkServer.Start(ctx); err != nil {
+			return fmt.Errorf("tink server failed: %w", err)
+		}
+		return nil
 	})
 
 	// Start Rufio
 	g.Go(func() error {
 		r := rufio.Controller{}
-		return r.Start(ctx)
+		if err := r.Start(ctx); err != nil {
+			return fmt.Errorf("rufio failed: %w", err)
+		}
+		return nil
 	})
 
 	// Start Hegel
@@ -87,7 +122,10 @@ func main() {
 		c.Hegel.Backend = "kubernetes"
 		ctrl.SetLogger(c.Hegel.Logger)
 		klog.SetLogger(c.Hegel.Logger)
-		return c.Hegel.Start(ctx)
+		if err := c.Hegel.Start(ctx); err != nil {
+			return fmt.Errorf("hegel failed: %w", err)
+		}
+		return nil
 	})
 
 	// Start Smee
@@ -104,7 +142,10 @@ func main() {
 		}
 		c.Smee.IPXE.HTTPScriptServer.ExtraKernelArgs = kernelArgs
 		c.Smee.Backend = nil
-		return c.Smee.Start(ctx, logger.WithName("smee"))
+		if err := c.Smee.Start(ctx, logger.WithName("smee")); err != nil {
+			return fmt.Errorf("smee failed: %w", err)
+		}
+		return nil
 	})
 
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {

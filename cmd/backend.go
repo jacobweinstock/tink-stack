@@ -25,17 +25,13 @@ type Kube struct {
 	// Namespace is an override for the Namespace the kubernetes client will watch.
 	// The default is the Namespace the pod is running in.
 	Namespace string
-	Enabled   bool
 }
 type File struct {
 	// FilePath is the path to a JSON FilePath containing hardware data.
 	FilePath string
-	Enabled  bool
 }
 
-type Noop struct {
-	Enabled bool
-}
+type Noop struct{}
 
 func (n *Noop) backend() *noop.Backend {
 	return &noop.Backend{}

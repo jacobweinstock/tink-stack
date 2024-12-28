@@ -111,7 +111,7 @@ func (r *Reconciler) processNewWorkflow(ctx context.Context, logger logr.Logger,
 		data["Hardware"] = contract
 	}
 
-	tinkWf, err := renderTemplateHardware(stored.Name, stringValue(tpl.Spec.Data), data)
+	tinkWf, err := renderTemplateHardware(stored.Name, zeroVal(tpl.Spec.Data), data)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -171,10 +171,9 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		Complete(r)
 }
 
-// StringValue turns string pointers into a string value.
-func stringValue(s *string) string {
-	if s == nil {
-		return ""
+func zeroVal[T any](v *T) T {
+	if v != nil {
+		return *v
 	}
-	return *s
+	return *new(T) // zero value of T
 }

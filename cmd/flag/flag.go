@@ -11,8 +11,17 @@ import (
 )
 
 type FlagConfig struct {
-	Name  string
-	Usage string
+	Name     string
+	Usage    string
+	disabled bool
+}
+
+func (f *FlagConfig) Disable() {
+	f.disabled = true
+}
+
+func (f *FlagConfig) Enable() {
+	f.disabled = false
 }
 
 type FlagSet struct {
@@ -50,4 +59,9 @@ func (fs *FlagSet) AddrLong(long string, pointer *netip.Addr, usage string) ff.F
 func (fs *FlagSet) URLLong(long string, pointer *url.URL, usage string) ff.Flag {
 	u := &nurl.URL{URL: pointer}
 	return fs.ValueLong(long, u, usage)
+}
+
+func (fs *FlagSet) PrefixLong(long string, pointer *netip.Prefix, usage string) ff.Flag {
+	p := &ntip.Prefix{Prefix: pointer}
+	return fs.ValueLong(long, p, usage)
 }

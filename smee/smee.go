@@ -149,6 +149,7 @@ type ISO struct {
 func (c *Config) Start(ctx context.Context, log logr.Logger) error {
 	if c.Backend == nil {
 		c.Backend = noop{}
+		c.Logger.Info("no backend provided, using noop backend")
 	}
 	oCfg := otel.Config{
 		Servicename: "smee",

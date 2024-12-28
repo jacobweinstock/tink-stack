@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/jacobweinstock/tink-stack/cmd/flag"
-	"github.com/jacobweinstock/tink-stack/cmd/flag/smee"
 	"github.com/peterbourgon/ff/v4"
 )
 
@@ -14,7 +13,6 @@ func newCLI(cfg *Config, fs *ff.FlagSet) *ff.Command {
 		Usage:    "tinkerbell [flags]",
 		LongHelp: "Tinkerbell stack.",
 		Flags:    fs,
-		//Options:    []ff.Option{ff.WithEnvVarPrefix("TINKERBELL")},
 	}
 }
 
@@ -48,5 +46,7 @@ func hegelFlags(c *Config, fs *ff.FlagSet) {
 }
 
 func smeeFlags(c *Config, fs *ff.FlagSet) {
-	smee.RegisterFlags(&flag.FlagSet{FlagSet: fs}, c.Smee)
+	sfs := flag.NewSmeeFlagSet()
+
+	flag.RegisterSmee(&flag.FlagSet{FlagSet: fs}, c.Smee, sfs)
 }

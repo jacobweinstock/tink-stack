@@ -43,3 +43,22 @@ func (a *Addr) Set(s string) error {
 func (a *Addr) Type() string {
 	return "addr"
 }
+
+type Prefix struct{ *netip.Prefix }
+
+func (p *Prefix) Set(s string) error {
+	if s == "" {
+		return nil
+	}
+	ip, err := netip.ParsePrefix(s)
+	if !ip.IsValid() && err != nil {
+		return fmt.Errorf("failed to parse Prefix: %q", s)
+	}
+	*p.Prefix = ip
+
+	return nil
+}
+
+func (p *Prefix) Type() string {
+	return "prefix"
+}
