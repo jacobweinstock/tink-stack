@@ -8,7 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/proto"
+	"github.com/jacobweinstock/tink-stack/tink/proto"
 	"github.com/jacobweinstock/tink-stack/tink/controller"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"

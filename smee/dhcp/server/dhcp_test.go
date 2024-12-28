@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/dhcpv4/nclient4"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
+	dp "github.com/jacobweinstock/tink-stack/smee/dhcp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/nettest"
 )
@@ -24,7 +24,7 @@ type mock struct {
 	Router      net.IP
 }
 
-func (m *mock) Handle(_ context.Context, conn *ipv4.PacketConn, d data.Packet) {
+func (m *mock) Handle(_ context.Context, conn *ipv4.PacketConn, d dp.Packet) {
 	if m.Log.GetSink() == nil {
 		m.Log = logr.Discard()
 	}

@@ -23,9 +23,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/insomniacslk/dhcp/dhcpv4"
+	"github.com/jacobweinstock/tink-stack/data"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/handler"
 	oteldhcp "github.com/jacobweinstock/tink-stack/smee/dhcp/otel"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -36,10 +35,20 @@ import (
 
 const tracerName = "github.com/jacobweinstock/tink-stack/smee/dhcp/handler/proxy"
 
+// BackendReader is the interface for getting data from a backend.
+//
+// Backends implement this interface to provide DHCP and Netboot data to the handlers.
+type BackendReader interface {
+	// Read data (from a backend) based on a mac address
+	// and return DHCP headers and options, including netboot info.
+	GetByMac(context.Context, net.HardwareAddr) (*data.DHCP, *data.Netboot, error)
+	GetByIP(context.Context, net.IP) (*data.DHCP, *data.Netboot, error)
+}
+
 // Handler holds the configuration details for the running the DHCP server.
 type Handler struct {
 	// Backend is the backend to use for getting DHCP data.
-	Backend handler.BackendReader
+	Backend BackendReader
 
 	// IPAddr is the IP address to use in DHCP responses.
 	// Option 54 and the sname DHCP header.
@@ -83,7 +92,7 @@ type Netboot struct {
 }
 
 // Redirection name comes from section 2.5 of http://www.pix.net/software/pxeboot/archive/pxespec.pdf
-func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, dp data.Packet) {
+func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, dp dhcp.Packet) {
 	// validations
 	if dp.Pkt == nil {
 		h.Log.Error(errors.New("incoming packet is nil"), "not able to respond when the incoming packet is nil")

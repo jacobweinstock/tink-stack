@@ -32,6 +32,8 @@ services:
       dockerfile: Dockerfile
     command: -kubeconfig /kubeconfig -namespace default -osie-url http://192.168.2.50:8787 -tink-server 192.168.2.50:42113
     network_mode: host
+    environment:
+      TINKERBELL_OTEL_ENDPOINT: 192.168.2.50:4317
     volumes:
       - ./script/cert/kubeconfig:/kubeconfig
     restart: on-failure
@@ -43,7 +45,7 @@ services:
     ## "init" containers; they run until they accomplish their purpose and then exit
   tink-crds-apply:
     image: bitnami/kubectl:1.30.4
-    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/tink/config/crd?ref=v0.10.0'
+    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/tink/config/crd?ref=v0.12.1'
     environment:
       KUBECONFIG: /kubeconfig
       KUBERNETES: https://kube-apiserver:6443
@@ -55,7 +57,7 @@ services:
 
   rufio-crds-apply:
     image: bitnami/kubectl:1.30.4
-    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/rufio/config/crd?ref=v0.3.3'
+    command: -s "https://kube-apiserver:6443" apply -k 'github.com/tinkerbell/rufio/config/crd?ref=v0.6.0'
     environment:
       KUBECONFIG: /kubeconfig
       KUBERNETES: https://kube-apiserver:6443

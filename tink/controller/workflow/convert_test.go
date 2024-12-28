@@ -6,13 +6,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/tink/controller/testtime"
-	"github.com/jacobweinstock/tink-stack/proto"
+	"github.com/jacobweinstock/tink-stack/tink/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-var convertTestTime = testtime.NewFrozenTimeUnix(1637361794)
 
 func TestToWorkflowContext(t *testing.T) {
 	cases := []struct {
@@ -109,8 +106,7 @@ func TestActionListCRDToProto(t *testing.T) {
 					APIVersion: "tinkerbell.org/v1alpha1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:              "wf1",
-					CreationTimestamp: *convertTestTime.MetaV1Now(),
+					Name: "wf1",
 				},
 				Spec:   v1alpha1.WorkflowSpec{},
 				Status: v1alpha1.WorkflowStatus{},
@@ -131,7 +127,6 @@ func TestActionListCRDToProto(t *testing.T) {
 					Annotations: map[string]string{
 						"workflow.tinkerbell.org/id": "7d9031ee-18d4-4ba4-b934-c3a78a1330f6",
 					},
-					CreationTimestamp: *convertTestTime.MetaV1Now(),
 				},
 				Spec: v1alpha1.WorkflowSpec{
 					TemplateRef: "MyCoolWorkflow",

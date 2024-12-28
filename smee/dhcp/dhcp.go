@@ -3,6 +3,7 @@ package dhcp
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -38,6 +39,24 @@ type UserClass string
 
 // ClientType is from DHCP option 60. Normally only PXEClient or HTTPClient.
 type ClientType string
+
+// Packet holds the data that is passed to a DHCP handler.
+type Packet struct {
+	// Peer is the address of the client that sent the DHCP message.
+	Peer net.Addr
+	// Pkt is the DHCP message.
+	Pkt *dhcpv4.DHCPv4
+	// Md is the metadata that was passed to the DHCP server.
+	Md *Metadata
+}
+
+// Metadata holds metadata about the DHCP packet that was received.
+type Metadata struct {
+	// IfName is the name of the interface that the DHCP message was received on.
+	IfName string
+	// IfIndex is the index of the interface that the DHCP message was received on.
+	IfIndex int
+}
 
 // ArchToBootFile maps supported hardware PXE architectures types to iPXE binary files.
 var ArchToBootFile = map[iana.Arch]string{
@@ -255,7 +274,7 @@ func IsNetbootClient(pkt *dhcpv4.DHCPv4) error {
 
 func wrapNonNil(err error, format string) error {
 	if err == nil {
-		return fmt.Errorf(format)
+		return errors.New(format)
 	}
 
 	return fmt.Errorf("%w: %v", err, format)

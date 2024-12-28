@@ -3,21 +3,18 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
+	"github.com/jacobweinstock/tink-stack/cmd"
 	"github.com/jacobweinstock/tink-stack/hegel"
 	"github.com/jacobweinstock/tink-stack/rufio"
-	smee "github.com/jacobweinstock/tink-stack/smee/cmd"
+	"github.com/jacobweinstock/tink-stack/smee"
 	"github.com/jacobweinstock/tink-stack/tink"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"github.com/peterbourgon/ff/v4"
+	"github.com/peterbourgon/ff/v4/ffhelp"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,21 +30,28 @@ type Config struct {
 	TinkServer     tink.Server      `json:"tink_server,omitempty"`
 	Rufio          rufio.Controller `json:"rufio,omitempty"`
 	Hegel          hegel.Server     `json:"hegel,omitempty"`
-	Smee           *smee.Service    `json:"smee,omitempty"`
+	Smee           *smee.Config     `json:"smee,omitempty"`
 }
 
 func main() {
+
 	ctx, done := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM)
 	defer done()
 
 	c := &Config{
-		Smee: &smee.Service{},
+		Smee: &smee.Config{},
 	}
-	fs := flag.NewFlagSet("tinkerbell", flag.ExitOnError)
+	fs := ff.NewFlagSet("tinkerbell")
 	cli := newCLI(c, fs)
-	cli.Parse(os.Args[1:])
+	if err := cli.Parse(os.Args[1:], ff.WithEnvVarPrefix("TINKERBELL")); err != nil {
+		if !errors.Is(err, ff.ErrHelp) {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		}
+		fmt.Fprintln(os.Stderr, ffhelp.Command(cli))
+		os.Exit(1)
+	}
 
-	logger := defaultLogger(c.LogLevel)
+	logger := cmd.DefaultLogger(c.LogLevel)
 
 	g, ctx := errgroup.WithContext(ctx)
 	// TODO(jacobweinstock): add a wait for the kcp server to be ready. Is there a way to do this in the plugin?
@@ -89,8 +93,8 @@ func main() {
 	// Start Smee
 	g.Go(func() error {
 		kernelArgs := []string{
-			c.Smee.IpxeHTTPScript.ExtraKernelArgs,
-			"tink_worker_image=quay.io/tinkerbell/tink-worker:v0.10.0",
+			"tink_worker_image=quay.io/tinkerbell/tink-worker:v0.12.1",
+			//			"tink_worker_image=127.0.0.1/embedded/tink-worker:v0.10.0",
 			"console=tty1",
 			"console=tty2",
 			"console=ttyAMA0,115200",
@@ -98,32 +102,12 @@ func main() {
 			"console=ttyS0,115200",
 			"console=ttyS1,115200",
 		}
-		c.Smee.IpxeHTTPScript.ExtraKernelArgs = strings.Join(kernelArgs, " ")
-		c.Smee.Backends.Kubernetes.ConfigFilePath = c.Kubeconfig
-		c.Smee.Backends.Kubernetes.Namespace = c.Namespace
-		c.Smee.Backends.Kubernetes.Enabled = true
+		c.Smee.IPXE.HTTPScriptServer.ExtraKernelArgs = kernelArgs
+		c.Smee.Backend = nil
 		return c.Smee.Start(ctx, logger.WithName("smee"))
 	})
 
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		panic(err)
 	}
-}
-
-// defaultLogger is zap logr implementation.
-func defaultLogger(level string) logr.Logger {
-	config := zap.NewProductionConfig()
-	config.OutputPaths = []string{"stdout"}
-	switch level {
-	case "debug":
-		config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
-	default:
-		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
-	}
-	zapLogger, err := config.Build()
-	if err != nil {
-		panic(fmt.Sprintf("who watches the watchmen (%v)?", err))
-	}
-
-	return zapr.NewLogger(zapLogger)
 }

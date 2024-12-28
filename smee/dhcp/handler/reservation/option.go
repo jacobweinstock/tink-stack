@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/insomniacslk/dhcp/dhcpv4"
+	"github.com/jacobweinstock/tink-stack/data"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
 	dhcpotel "github.com/jacobweinstock/tink-stack/smee/dhcp/otel"
-	"github.com/jacobweinstock/tink-stack/smee/otel"
+	"github.com/jacobweinstock/tink-stack/otel"
 )
 
 // setDHCPOpts takes a client dhcp packet and data (typically from a backend) and creates a slice of DHCP packet modifiers.

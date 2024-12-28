@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/proto"
+	"github.com/jacobweinstock/tink-stack/tink/proto"
 	"github.com/jacobweinstock/tink-stack/tink/controller/workflow"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"

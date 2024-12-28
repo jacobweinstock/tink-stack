@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/tink/controller/testtime"
+	"github.com/jacobweinstock/tink-stack/tink/internal/testtime"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,9 +18,6 @@ import (
 )
 
 var runtimescheme = runtime.NewScheme()
-
-// TestTime is a static time that can be used for testing.
-var TestTime = testtime.NewFrozenTimeUnix(1637361793)
 
 func init() {
 	_ = clientgoscheme.AddToScheme(runtimescheme)
@@ -484,8 +481,8 @@ tasks:
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    v1alpha1.WorkflowStateRunning,
-									StartedAt: TestTime.MetaV1BeforeSec(601),
+									Status: v1alpha1.WorkflowStateRunning,
+									StartedAt: testtime.NewFrozenTimeUnix(1637361793).MetaV1BeforeSec(601),
 								},
 							},
 						},
@@ -570,10 +567,10 @@ tasks:
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    v1alpha1.WorkflowStateTimeout,
-									StartedAt: TestTime.MetaV1BeforeSec(601),
-									Seconds:   601,
-									Message:   "Action timed out",
+									Status:  v1alpha1.WorkflowStateTimeout,
+									Seconds: 601,
+									StartedAt: testtime.NewFrozenTimeUnix(1637361793).MetaV1BeforeSec(601),
+									Message: "Action timed out",
 								},
 							},
 						},
@@ -813,7 +810,7 @@ tasks:
 		}
 		controller := &Reconciler{
 			client:  kc.Build(),
-			nowFunc: TestTime.Now,
+			nowFunc: testtime.NewFrozenTimeUnix(1637361793).Now,
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
@@ -844,7 +841,7 @@ tasks:
 				return
 			}
 
-			if diff := cmp.Diff(tc.wantWflow, wflow); diff != "" {
+			if diff := cmp.Diff(wflow, tc.wantWflow); diff != "" {
 				t.Errorf("unexpected difference:\n%v", diff)
 			}
 		})

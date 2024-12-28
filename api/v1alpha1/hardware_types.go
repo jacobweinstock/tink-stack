@@ -87,6 +87,11 @@ type Interface struct {
 
 	//+optional
 	DHCP *DHCP `json:"dhcp,omitempty"`
+
+	// DisableDHCP disables DHCP for this interface.
+	// +kubebuilder:default=false
+	// +optional
+	DisableDHCP bool `json:"disableDhcp,omitempty"`
 }
 
 // Netboot configuration.
@@ -143,7 +148,6 @@ type IP struct {
 }
 
 type HardwareMetadata struct {
-	// +kubebuilder:default:=provisioning
 	State        string                `json:"state,omitempty"`
 	BondingMode  int64                 `json:"bonding_mode,omitempty"`
 	Manufacturer *MetadataManufacturer `json:"manufacturer,omitempty"`

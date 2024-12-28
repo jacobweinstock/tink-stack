@@ -18,7 +18,8 @@ import (
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/iana"
 	"github.com/insomniacslk/dhcp/rfc1035label"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
+	"github.com/jacobweinstock/tink-stack/data"
+	"github.com/jacobweinstock/tink-stack/smee/dhcp"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/net/ipv4"
@@ -335,7 +336,7 @@ func TestHandle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s.Handle(context.Background(), con, data.Packet{Peer: peer, Pkt: tt.req, Md: &data.Metadata{IfName: n.Name, IfIndex: n.Index}})
+			s.Handle(context.Background(), con, dhcp.Packet{Peer: peer, Pkt: tt.req, Md: &dhcp.Metadata{IfName: n.Name, IfIndex: n.Index}})
 
 			msg, err := client(pc)
 			if !errors.Is(err, tt.wantErr) {

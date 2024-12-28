@@ -4,10 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-var TestNow = NewFrozenTimeUnix(1637361793)
 
 func TestWorkflowTinkID(t *testing.T) {
 	id := "d2c26e20-97e0-449c-b665-61efa7373f47"
@@ -104,9 +103,8 @@ func TestGetStartTime(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateSuccess,
-									StartedAt: TestNow.MetaV1Now(),
-									Seconds:   20,
+									Status:  WorkflowStateSuccess,
+									Seconds: 20,
 								},
 								{
 									Name:    "stream-debian-image",
@@ -117,15 +115,14 @@ func TestGetStartTime(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateRunning,
-									StartedAt: TestNow.MetaV1AfterSec(21),
+									Status: WorkflowStateRunning,
 								},
 							},
 						},
 					},
 				},
 			},
-			TestNow.MetaV1Now(),
+			nil,
 		},
 		{
 			"pending without a start time",
@@ -235,9 +232,8 @@ func TestWorkflowMethods(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateSuccess,
-									StartedAt: TestNow.MetaV1Now(),
-									Seconds:   20,
+									Status:  WorkflowStateSuccess,
+									Seconds: 20,
 								},
 								{
 									Name:    "stream-debian-image",
@@ -248,8 +244,7 @@ func TestWorkflowMethods(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateRunning,
-									StartedAt: TestNow.MetaV1AfterSec(21),
+									Status: WorkflowStateRunning,
 								},
 							},
 						},
@@ -287,12 +282,11 @@ func TestWorkflowMethods(t *testing.T) {
 							WorkerAddr: "pbnj",
 							Actions: []Action{
 								{
-									Name:      "configure-pxe",
-									Image:     "quay.io/tinkerbell-actions/pbnj:v1.0.0",
-									Timeout:   20,
-									Status:    WorkflowStateSuccess,
-									StartedAt: TestNow.MetaV1BeforeSec(15),
-									Seconds:   15,
+									Name:    "configure-pxe",
+									Image:   "quay.io/tinkerbell-actions/pbnj:v1.0.0",
+									Timeout: 20,
+									Status:  WorkflowStateSuccess,
+									Seconds: 15,
 								},
 							},
 						},
@@ -309,9 +303,8 @@ func TestWorkflowMethods(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateSuccess,
-									StartedAt: TestNow.MetaV1Now(),
-									Seconds:   20,
+									Status:  WorkflowStateSuccess,
+									Seconds: 20,
 								},
 								{
 									Name:    "write-file",
@@ -322,8 +315,7 @@ func TestWorkflowMethods(t *testing.T) {
 										"DEST_DISK":  "/dev/nvme0n1",
 										"IMG_URL":    "http://10.1.1.11:8080/debian-10-openstack-amd64.raw.gz",
 									},
-									Status:    WorkflowStateRunning,
-									StartedAt: TestNow.MetaV1AfterSec(21),
+									Status: WorkflowStateRunning,
 								},
 							},
 						},
@@ -403,6 +395,47 @@ func TestWorkflowMethods(t *testing.T) {
 			got := tc.wf.getTaskActionInfo()
 			if got != tc.want {
 				t.Errorf("Got \n\t%#v\nwanted:\n\t%#v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSetCondition(t *testing.T) {
+	tests := map[string]struct {
+		ExistingConditions []WorkflowCondition
+		WantConditions     []WorkflowCondition
+		Condition          WorkflowCondition
+	}{
+		"update existing condition": {
+			ExistingConditions: []WorkflowCondition{
+				{Type: ToggleAllowNetbootTrue, Status: metav1.ConditionTrue},
+				{Type: ToggleAllowNetbootFalse, Status: metav1.ConditionTrue},
+			},
+			WantConditions: []WorkflowCondition{
+				{Type: ToggleAllowNetbootTrue, Status: metav1.ConditionFalse},
+				{Type: ToggleAllowNetbootFalse, Status: metav1.ConditionTrue},
+			},
+			Condition: WorkflowCondition{Type: ToggleAllowNetbootTrue, Status: metav1.ConditionFalse},
+		},
+		"append new condition": {
+			ExistingConditions: []WorkflowCondition{
+				{Type: ToggleAllowNetbootTrue, Status: metav1.ConditionTrue},
+			},
+			WantConditions: []WorkflowCondition{
+				{Type: ToggleAllowNetbootTrue, Status: metav1.ConditionTrue},
+				{Type: ToggleAllowNetbootFalse, Status: metav1.ConditionFalse},
+			},
+			Condition: WorkflowCondition{Type: ToggleAllowNetbootFalse, Status: metav1.ConditionFalse},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			w := &WorkflowStatus{
+				Conditions: tt.ExistingConditions,
+			}
+			w.SetCondition(tt.Condition)
+			if !cmp.Equal(tt.WantConditions, w.Conditions) {
+				t.Errorf("SetCondition() mismatch (-want +got):\n%s", cmp.Diff(tt.WantConditions, w.Conditions))
 			}
 		})
 	}

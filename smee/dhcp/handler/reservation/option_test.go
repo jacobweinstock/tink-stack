@@ -14,10 +14,10 @@ import (
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/insomniacslk/dhcp/iana"
 	"github.com/insomniacslk/dhcp/rfc1035label"
+	"github.com/jacobweinstock/tink-stack/data"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
 	oteldhcp "github.com/jacobweinstock/tink-stack/smee/dhcp/otel"
-	dhcpotel "github.com/jacobweinstock/tink-stack/smee/otel"
+	dhcpotel "github.com/jacobweinstock/tink-stack/otel"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )

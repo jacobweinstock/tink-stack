@@ -10,7 +10,7 @@ import (
 	"path"
 
 	"github.com/go-logr/logr"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/handler"
+	"github.com/jacobweinstock/tink-stack/data"
 	"github.com/jacobweinstock/tink-stack/smee/metric"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
@@ -18,9 +18,19 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// BackendReader is the interface for getting data from a backend.
+//
+// Backends implement this interface to provide DHCP and Netboot data to the handlers.
+type BackendReader interface {
+	// Read data (from a backend) based on a mac address
+	// and return DHCP headers and options, including netboot info.
+	GetByMac(context.Context, net.HardwareAddr) (*data.DHCP, *data.Netboot, error)
+	GetByIP(context.Context, net.IP) (*data.DHCP, *data.Netboot, error)
+}
+
 type Handler struct {
 	Logger                logr.Logger
-	Backend               handler.BackendReader
+	Backend               BackendReader
 	OSIEURL               string
 	ExtraKernelParams     []string
 	PublicSyslogFQDN      string
@@ -32,7 +42,7 @@ type Handler struct {
 	StaticIPXEEnabled     bool
 }
 
-type data struct {
+type info struct {
 	AllowNetboot  bool // If true, the client will be provided netboot options in the DHCP offer/ack.
 	Console       string
 	MACAddress    net.HardwareAddr
@@ -42,20 +52,31 @@ type data struct {
 	Facility      string
 	IPXEScript    string
 	IPXEScriptURL *url.URL
+	OSIE          OSIE
 }
 
-// getByMac uses the handler.BackendReader to get the (hardware) data and then
+// OSIE or OS Installation Environment is the data about where the OSIE parts are located.
+type OSIE struct {
+	// BaseURL is the URL where the OSIE parts are located.
+	BaseURL *url.URL
+	// Kernel is the name of the kernel file.
+	Kernel string
+	// Initrd is the name of the initrd file.
+	Initrd string
+}
+
+// getByMac uses the BackendReader to get the (hardware) data and then
 // translates it to the script.Data struct.
-func getByMac(ctx context.Context, mac net.HardwareAddr, br handler.BackendReader) (data, error) {
+func getByMac(ctx context.Context, mac net.HardwareAddr, br BackendReader) (info, error) {
 	if br == nil {
-		return data{}, errors.New("backend is nil")
+		return info{}, errors.New("backend is nil")
 	}
 	d, n, err := br.GetByMac(ctx, mac)
 	if err != nil {
-		return data{}, err
+		return info{}, err
 	}
 
-	return data{
+	return info{
 		AllowNetboot:  n.AllowNetboot,
 		Console:       "",
 		MACAddress:    d.MACAddress,
@@ -65,19 +86,20 @@ func getByMac(ctx context.Context, mac net.HardwareAddr, br handler.BackendReade
 		Facility:      n.Facility,
 		IPXEScript:    n.IPXEScript,
 		IPXEScriptURL: n.IPXEScriptURL,
+		OSIE:          OSIE(n.OSIE),
 	}, nil
 }
 
-func getByIP(ctx context.Context, ip net.IP, br handler.BackendReader) (data, error) {
+func getByIP(ctx context.Context, ip net.IP, br BackendReader) (info, error) {
 	if br == nil {
-		return data{}, errors.New("backend is nil")
+		return info{}, errors.New("backend is nil")
 	}
 	d, n, err := br.GetByIP(ctx, ip)
 	if err != nil {
-		return data{}, err
+		return info{}, err
 	}
 
-	return data{
+	return info{
 		AllowNetboot:  n.AllowNetboot,
 		Console:       "",
 		MACAddress:    d.MACAddress,
@@ -87,6 +109,7 @@ func getByIP(ctx context.Context, ip net.IP, br handler.BackendReader) (data, er
 		Facility:      n.Facility,
 		IPXEScript:    n.IPXEScript,
 		IPXEScriptURL: n.IPXEScriptURL,
+		OSIE:          OSIE(n.OSIE),
 	}, nil
 }
 
@@ -199,7 +222,7 @@ func getMAC(urlPath string) (net.HardwareAddr, error) {
 	return ha, nil
 }
 
-func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw data) {
+func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, name string, hw info) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(attribute.String("smee.script_name", name))
 	var script []byte
@@ -246,7 +269,7 @@ func (h *Handler) serveBootScript(ctx context.Context, w http.ResponseWriter, na
 	}
 }
 
-func (h *Handler) defaultScript(span trace.Span, hw data) (string, error) {
+func (h *Handler) defaultScript(span trace.Span, hw info) (string, error) {
 	mac := hw.MACAddress
 	arch := hw.Arch
 	if arch == "" {
@@ -274,6 +297,15 @@ func (h *Handler) defaultScript(span trace.Span, hw data) (string, error) {
 		Retries:               h.IPXEScriptRetries,
 		RetryDelay:            h.IPXEScriptRetryDelay,
 	}
+	if hw.OSIE.BaseURL != nil {
+		auto.DownloadURL = hw.OSIE.BaseURL.String()
+	}
+	if hw.OSIE.Kernel != "" {
+		auto.Kernel = hw.OSIE.Kernel
+	}
+	if hw.OSIE.Initrd != "" {
+		auto.Initrd = hw.OSIE.Initrd
+	}
 	if sc := span.SpanContext(); sc.IsSampled() {
 		auto.TraceID = sc.TraceID().String()
 	}
@@ -282,7 +314,7 @@ func (h *Handler) defaultScript(span trace.Span, hw data) (string, error) {
 }
 
 // customScript returns the custom script or chain URL if defined in the hardware data otherwise an error.
-func (h *Handler) customScript(hw data) (string, error) {
+func (h *Handler) customScript(hw info) (string, error) {
 	if chain := hw.IPXEScriptURL; chain != nil && chain.String() != "" {
 		if chain.Scheme != "http" && chain.Scheme != "https" {
 			return "", fmt.Errorf("invalid URL scheme: %v", chain.Scheme)

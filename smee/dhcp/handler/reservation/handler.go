@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/insomniacslk/dhcp/dhcpv4"
+	"github.com/jacobweinstock/tink-stack/data"
 	"github.com/jacobweinstock/tink-stack/smee/dhcp"
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
 	oteldhcp "github.com/jacobweinstock/tink-stack/smee/dhcp/otel"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -23,16 +23,13 @@ const tracerName = "github.com/tinkerbell/smee"
 // setDefaults will update the Handler struct to have default values so as
 // to avoid panic for nil pointers and such.
 func (h *Handler) setDefaults() {
-	if h.Backend == nil {
-		h.Backend = noop{}
-	}
 	if h.Log.GetSink() == nil {
 		h.Log = logr.Discard()
 	}
 }
 
 // Handle responds to DHCP messages with DHCP server options.
-func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, p data.Packet) {
+func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, p dhcp.Packet) {
 	h.setDefaults()
 	if p.Pkt == nil {
 		h.Log.Error(errors.New("incoming packet is nil"), "not able to respond when the incoming packet is nil")
@@ -83,6 +80,12 @@ func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, p data.Pack
 
 			return
 		}
+		if d.Disabled {
+			log.Info("DHCP is disabled for this MAC address, no response sent", "type", p.Pkt.MessageType().String())
+			span.SetStatus(codes.Ok, "disabled DHCP response")
+
+			return
+		}
 		log.Info("received DHCP packet", "type", p.Pkt.MessageType().String())
 		reply = h.updateMsg(ctx, p.Pkt, d, n, dhcpv4.MessageTypeOffer)
 		log = log.WithValues("type", dhcpv4.MessageTypeOffer.String())
@@ -95,6 +98,12 @@ func (h *Handler) Handle(ctx context.Context, conn *ipv4.PacketConn, p data.Pack
 			}
 			log.Info("error reading from backend", "error", err)
 			span.SetStatus(codes.Error, err.Error())
+
+			return
+		}
+		if d.Disabled {
+			log.Info("DHCP is disabled for this MAC address, no response sent", "type", p.Pkt.MessageType().String())
+			span.SetStatus(codes.Ok, "disabled DHCP response")
 
 			return
 		}

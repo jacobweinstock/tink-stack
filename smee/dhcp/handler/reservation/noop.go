@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/jacobweinstock/tink-stack/smee/dhcp/data"
+	"github.com/jacobweinstock/tink-stack/data"
 )
 
 // Handler is a noop backend.

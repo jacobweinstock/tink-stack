@@ -8,12 +8,12 @@ import (
 	"github.com/go-logr/zapr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/proto"
-	"github.com/jacobweinstock/tink-stack/tink/controller/testtime"
+	"github.com/jacobweinstock/tink-stack/tink/internal/testtime"
+	"github.com/jacobweinstock/tink-stack/tink/proto"
 	"go.uber.org/zap"
 )
 
-var TestTime = testtime.NewFrozenTimeUnix(1637361793)
+var ttime = testtime.NewFrozenTimeUnix(1637361793)
 
 func TestModifyWorkflowState(t *testing.T) {
 	cases := []struct {
@@ -148,7 +148,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_RUNNING",
-									StartedAt: TestTime.MetaV1Now(),
+									StartedAt: ttime.MetaV1Now(),
 								},
 							},
 						},
@@ -173,7 +173,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_RUNNING",
-									StartedAt: TestTime.MetaV1Before(time.Second * 301),
+									StartedAt: ttime.MetaV1Before(time.Second * 301),
 								},
 							},
 						},
@@ -202,7 +202,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_TIMEOUT",
-									StartedAt: TestTime.MetaV1Before(time.Second * 301),
+									StartedAt: ttime.MetaV1Before(time.Second * 301),
 									Seconds:   301,
 								},
 							},
@@ -228,7 +228,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_RUNNING",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 								},
 								{
 									Name:    "kexec",
@@ -263,7 +263,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_FAILED",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 									Seconds:   30,
 								},
 								{
@@ -295,7 +295,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_RUNNING",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 								},
 								{
 									Name:    "kexec",
@@ -330,7 +330,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_SUCCESS",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 									Seconds:   30,
 								},
 								{
@@ -362,7 +362,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_SUCCESS",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 									Seconds:   27,
 								},
 								{
@@ -398,7 +398,7 @@ func TestModifyWorkflowState(t *testing.T) {
 									Image:     "quay.io/tinkerbell-actions/image2disk:v1.0.0",
 									Timeout:   300,
 									Status:    "STATE_SUCCESS",
-									StartedAt: TestTime.MetaV1Before(time.Second * 30),
+									StartedAt: ttime.MetaV1Before(time.Second * 30),
 									Seconds:   27,
 								},
 								{
@@ -422,7 +422,7 @@ func TestModifyWorkflowState(t *testing.T) {
 				logger:     zapr.NewLogger(zap.Must(zap.NewDevelopment())),
 				ClientFunc: nil,
 				namespace:  "default",
-				nowFunc:    TestTime.Now,
+				nowFunc:    ttime.Now,
 			}
 			gotErr := server.modifyWorkflowState(tc.inputWf, tc.inputWfContext)
 			compareErrors(t, gotErr, tc.wantErr)

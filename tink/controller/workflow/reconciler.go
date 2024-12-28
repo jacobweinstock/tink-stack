@@ -9,7 +9,6 @@ import (
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"knative.dev/pkg/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -112,7 +111,7 @@ func (r *Reconciler) processNewWorkflow(ctx context.Context, logger logr.Logger,
 		data["Hardware"] = contract
 	}
 
-	tinkWf, err := renderTemplateHardware(stored.Name, ptr.StringValue(tpl.Spec.Data), data)
+	tinkWf, err := renderTemplateHardware(stored.Name, stringValue(tpl.Spec.Data), data)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -141,7 +140,8 @@ func toTemplateHardwareData(hardware v1alpha1.Hardware) templateHardwareData {
 
 func (r *Reconciler) processRunningWorkflow(_ context.Context, stored *v1alpha1.Workflow) reconcile.Result {
 	// Check for global timeout expiration
-	if r.nowFunc().After(stored.GetStartTime().Add(time.Duration(stored.Status.GlobalTimeout) * time.Second)) {
+	st := stored.GetStartTime()
+	if st != nil && r.nowFunc().After(st.Add(time.Duration(stored.Status.GlobalTimeout)*time.Second)) {
 		stored.Status.State = v1alpha1.WorkflowStateTimeout
 	}
 
@@ -169,4 +169,12 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager) error {
 		NewControllerManagedBy(mgr).
 		For(&v1alpha1.Workflow{}).
 		Complete(r)
+}
+
+// StringValue turns string pointers into a string value.
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

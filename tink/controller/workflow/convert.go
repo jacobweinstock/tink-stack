@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/jacobweinstock/tink-stack/api/v1alpha1"
-	"github.com/jacobweinstock/tink-stack/proto"
+	"github.com/jacobweinstock/tink-stack/tink/proto"
 )
 
 func ToWorkflowContext(wf *v1alpha1.Workflow) *proto.WorkflowContext {
