@@ -12,12 +12,12 @@ type FlagConfig struct {
 	disabled bool
 }
 
-// FlagConfigSet allows for helper methods on FlagConfig's to be created.
-type FlagConfigSet map[string]*FlagConfig
-
 type FlagSet struct {
 	*ff.FlagSet
 }
+
+// FlagConfigSet allows for helper methods on FlagConfig's to be created.
+type FlagConfigSet map[string]*FlagConfig
 
 func (f *FlagConfig) Disable() {
 	f.disabled = true
@@ -50,6 +50,14 @@ func (s FlagConfigSet) Get(name string) FlagConfig {
 		return *f
 	}
 	return FlagConfig{}
+}
+
+func Register(fs *ff.FlagSet, f *ff.FlagConfig, fv flag.Value) {
+	fs.AddFlag(ff.FlagConfig{
+		LongName: f.LongName,
+		Usage:    f.Usage,
+		Value:    fv,
+	})
 }
 
 func zeroVal[T any](v *T) T {

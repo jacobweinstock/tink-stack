@@ -62,3 +62,44 @@ func (p *Prefix) Set(s string) error {
 func (p *Prefix) Type() string {
 	return "prefix"
 }
+
+type PrefixList struct {
+	PrefixList *[]netip.Prefix
+}
+
+func (p *PrefixList) Set(s string) error {
+	if s == "" {
+		return nil
+	}
+	pl := strings.Split(s, ",")
+	results := make([]netip.Prefix, 0, len(pl))
+	for _, prefix := range pl {
+		ip, err := netip.ParsePrefix(prefix)
+		if !ip.IsValid() && err != nil {
+			return fmt.Errorf("failed to parse Prefix: %q", prefix)
+		}
+		results = append(results, ip)
+	}
+	*p.PrefixList = results
+
+	return nil
+}
+
+func (p *PrefixList) Type() string {
+	return "prefix list"
+}
+
+func ToPrefixList(p *[]netip.Prefix) *PrefixList {
+	pl := PrefixList{PrefixList: p}
+
+	return &pl
+}
+
+func (p *PrefixList) String() string {
+	var pl []string
+	for _, prefix := range *p.PrefixList {
+		pl = append(pl, prefix.String())
+	}
+
+	return strings.Join(pl, ",")
+}

@@ -19,11 +19,14 @@ func newCLI(cfg *Config, fs *ff.FlagSet) *ff.Command {
 
 func setFlags(c *Config, fs *ff.FlagSet) {
 	// Global flags
-	fs.StringVar(&c.LogLevel, 0, "log-level", "info", "log level (debug, info)")
-	fs.StringVar(&c.Kubeconfig, 0, "kubeconfig", "~/.kube/config", "path to kubeconfig file")
-	fs.StringVar(&c.Namespace, 0, "namespace", "tink-system", "namespace for all Tinkerbell resources")
-	fs.StringVar(&c.PublicIPv4, 0, "public-ipv4", "", "public IPv4 address to use for all services")
-
+	gfs := config.NewGlobalFlagSet()
+	config.RegisterGlobal(&flag.FlagSet{FlagSet: fs}, c.Global, gfs)
+	/*
+		fs.StringVar(&c.LogLevel, 0, "log-level", "info", "log level (debug, info)")
+		fs.StringVar(&c.Kubeconfig, 0, "kubeconfig", "~/.kube/config", "path to kubeconfig file")
+		fs.StringVar(&c.Namespace, 0, "namespace", "tink-system", "namespace for all Tinkerbell resources")
+		fs.StringVar(&c.PublicIPv4, 0, "public-ipv4", "", "public IPv4 address to use for all services")
+	*/
 	tinkControllerFlags(c, fs)
 	tinkServerFlags(c, fs)
 	hegelFlags(c, fs)

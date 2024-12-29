@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/jacobweinstock/tink-stack/cmd"
+	"github.com/jacobweinstock/tink-stack/cmd/flag/config"
 	"github.com/jacobweinstock/tink-stack/hegel"
 	"github.com/jacobweinstock/tink-stack/rufio"
 	"github.com/jacobweinstock/tink-stack/smee"
@@ -23,18 +24,13 @@ import (
 
 type Config struct {
 	// LogLevel is the log level for the application.
-	LogLevel       string           `json:"log_level,omitempty"`
-	Backend        backend          `json:"backend,omitempty"`
-	OTEL           otel             `json:"otel,omitempty"`
-	Kubeconfig     string           `json:"kubeconfig,omitempty"`
-	Namespace      string           `json:"namespace,omitempty"`
-	PublicIPv4     string           `json:"public_ipv4,omitempty"`
-	TrustedProxies []netip.Prefix   `json:"trusted_proxies,omitempty"`
-	TinkController tink.Controller  `json:"tink_controller,omitempty"`
-	TinkServer     tink.Server      `json:"tink_server,omitempty"`
-	Rufio          rufio.Controller `json:"rufio,omitempty"`
-	Hegel          hegel.Server     `json:"hegel,omitempty"`
-	Smee           *smee.Config     `json:"smee,omitempty"`
+	Global         *config.GlobalConfig `json:"global,inline"`
+	OTEL           otel                 `json:"otel,omitempty"`
+	TinkController tink.Controller      `json:"tink_controller,omitempty"`
+	TinkServer     tink.Server          `json:"tink_server,omitempty"`
+	Rufio          rufio.Controller     `json:"rufio,omitempty"`
+	Hegel          hegel.Server         `json:"hegel,omitempty"`
+	Smee           *smee.Config         `json:"smee,omitempty"`
 }
 
 type otel struct {
@@ -60,6 +56,11 @@ func main() {
 				Mode: smee.DHCPModeProxy,
 			},
 		},
+		Global: &config.GlobalConfig{
+			TrustedProxies: []netip.Prefix{
+				netip.MustParsePrefix("8.8.8.8/32"),
+			},
+		},
 	}
 	fs := ff.NewFlagSet("tinkerbell")
 	cli := newCLI(c, fs)
@@ -72,11 +73,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := cmd.DefaultLogger(c.LogLevel)
+	logger := cmd.DefaultLogger(c.Global.LogLevel)
 	logger.Info("debugging", "c.Smee.DHCP.Enabled", c.Smee.DHCP.Enabled)
 	logger.Info("debugging", "c.Smee.DHCP.TFTPPort", c.Smee.DHCP.TFTPPort)
 	logger.Info("debugging", "c.Smee.DHCP.IPForPacket", c.Smee.DHCP.IPForPacket)
 	logger.Info("debugging", "c.Smee.DHCP.Mode", c.Smee.DHCP.Mode)
+	logger.Info("debugging", "c.Global.TrustedProxies", c.Global.TrustedProxies)
+	logger.Info("debugging", "c.Global.PublicIP", c.Global.PublicIP)
 	return
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -87,7 +90,7 @@ func main() {
 	// Start the Tink controller
 	g.Go(func() error {
 		c.TinkController.Logger = logger.WithName("tink-controller")
-		c.TinkController.Kubeconfig = c.Kubeconfig
+		c.TinkController.Kubeconfig = c.Global.BackendKubeConfig
 		if err := c.TinkController.Start(ctx); err != nil {
 			return fmt.Errorf("tink controller failed: %w", err)
 		}
@@ -97,8 +100,8 @@ func main() {
 	// Start the Tink Server
 	g.Go(func() error {
 		c.TinkServer.Logger = logger.WithName("tink-server")
-		c.TinkServer.KubeconfigPath = c.Kubeconfig
-		c.TinkServer.KubeNamespace = c.Namespace
+		c.TinkServer.KubeconfigPath = c.Global.BackendKubeConfig
+		c.TinkServer.KubeNamespace = c.Global.BackendKubeNamespace
 		if err := c.TinkServer.Start(ctx); err != nil {
 			return fmt.Errorf("tink server failed: %w", err)
 		}
@@ -117,8 +120,8 @@ func main() {
 	// Start Hegel
 	g.Go(func() error {
 		c.Hegel.Logger = logger.WithName("hegel")
-		c.Hegel.KubernetesKubeconfig = c.Kubeconfig
-		c.Hegel.KubernetesNamespace = c.Namespace
+		c.Hegel.KubernetesKubeconfig = c.Global.BackendKubeConfig
+		c.Hegel.KubernetesNamespace = c.Global.BackendKubeNamespace
 		c.Hegel.Backend = "kubernetes"
 		ctrl.SetLogger(c.Hegel.Logger)
 		klog.SetLogger(c.Hegel.Logger)
