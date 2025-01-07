@@ -15,6 +15,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
@@ -52,6 +54,23 @@ func NewBackend(conf *rest.Config, opts ...cluster.Option) (*Backend, error) {
 // Start starts the client-side cache.
 func (b *Backend) Start(ctx context.Context) error {
 	return b.cluster.Start(ctx)
+}
+
+func NewFileRestConfig(kubeconfigPath, namespace string) (*rest.Config, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = kubeconfigPath
+
+	overrides := &clientcmd.ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "",
+		},
+		Context: clientcmdapi.Context{
+			Namespace: namespace,
+		},
+	}
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
+
+	return loader.ClientConfig()
 }
 
 // GetByMac implements the handler.BackendReader interface and returns DHCP and netboot data based on a mac address.

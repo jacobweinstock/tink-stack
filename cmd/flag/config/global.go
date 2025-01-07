@@ -26,7 +26,7 @@ func RegisterGlobal(fs *flag.FlagSet, gc *GlobalConfig, m flag.FlagConfigSet) {
 		m = NewGlobalFlagSet()
 	}
 
-	fs.Register(m.Get(LogLevelConfig.Name), ffval.NewEnum(&gc.LogLevel, "debug", "info"))
+	fs.Register(m.Get(LogLevelConfig.Name), ffval.NewEnum(&gc.LogLevel, "info", "debug"))
 	fs.Register(m.Get(BackendConfig.Name), ffval.NewEnum(&gc.Backend, "kube", "file", "none"))
 	fs.Register(m.Get(BackendFilePath.Name), ffval.NewValueDefault(&gc.BackendFilePath, gc.BackendFilePath))
 	fs.Register(m.Get(BackendKubeConfig.Name), ffval.NewValueDefault(&gc.BackendKubeConfig, gc.BackendKubeConfig))

@@ -11,7 +11,7 @@ import (
 	"github.com/peterbourgon/ff/v4/ffval"
 )
 
-func RegisterSmee(fs *flag.FlagSet, sc *smee.Config, m flag.FlagConfigSet) {
+func RegisterSmeeFlags(fs *flag.FlagSet, sc *smee.Config, m flag.FlagConfigSet) {
 	if m == nil {
 		m = NewSmeeFlagSet()
 	}

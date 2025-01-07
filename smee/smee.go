@@ -147,6 +147,7 @@ type ISO struct {
 
 // Start will run Smee services. Enabling and disabling services is controlled by the Config struct.
 func (c *Config) Start(ctx context.Context, log logr.Logger) error {
+	c.Logger = log
 	if c.Backend == nil {
 		c.Backend = noop{}
 		c.Logger.Info("no backend provided, using noop backend")
@@ -305,7 +306,7 @@ func (c *Config) Start(ctx context.Context, log logr.Logger) error {
 	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("failed running all Smee services: %w", err)
 	}
-	log.Info("smee is shutting down")
+	log.Info("smee is shutting down", "reason", ctx.Err())
 	return nil
 }
 
